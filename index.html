@@ -134,6 +134,14 @@
     letter-spacing: 0.08em; text-transform: uppercase; text-align: center;
   }
   .join-row input::placeholder { text-transform: none; letter-spacing: normal; color: var(--text-muted); }
+  .config-block { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  .config-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .config-row label { font-size: 14px; color: var(--text-muted); }
+  select {
+    font-family: var(--font-body); font-size: 14.5px; color: var(--text);
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 14px;
+  }
   .error-msg { color: var(--danger); font-size: 14px; }
   .home-foot { color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
 
@@ -201,8 +209,11 @@
   .discard-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .discard-row .card-chip { background: var(--teal-soft); min-width: 38px; height: 46px; font-size: 16px; }
 
-  .opponent-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-2); border-radius: 12px; font-size: 14px; color: var(--text-muted); }
-  .opponent-row strong { color: var(--text); font-weight: 600; }
+  .players-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .player-chip { padding: 8px 13px; background: var(--surface-2); border-radius: 999px; font-size: 13.5px; color: var(--text-muted); }
+  .player-chip strong { color: var(--text); font-weight: 600; }
+  .timer-tag { font-size: 13.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; padding: 4px 10px; background: var(--surface-2); border-radius: 999px; }
+  .timer-tag.urgent { color: var(--danger); background: var(--danger-soft); }
 
   .hand-section { display: flex; flex-direction: column; gap: 10px; }
   .hand-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; -webkit-overflow-scrolling: touch; }
@@ -334,6 +345,61 @@ const firebaseConfig = {
     return deck.slice(order*level, order*level+level).sort((a,b)=>a-b);
   }
 
+  // ---------------- sound ----------------
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume().catch(function(){}); }
+    return audioCtx;
+  }
+  function playTone(freq, duration, type, volume){
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(volume || 0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    } catch(e) {}
+  }
+  function playChime(notes){
+    let t = 0;
+    notes.forEach(function(freq){
+      setTimeout(function(){ playTone(freq, 0.18, 'sine', 0.07); }, t);
+      t += 140;
+    });
+  }
+  function playCardSound(){ playTone(660, 0.13, 'sine', 0.09); }
+  function playStarSound(){ playTone(520, 0.18, 'triangle', 0.08); }
+  function playMistakeSound(){ playTone(150, 0.35, 'sawtooth', 0.09); }
+  function playTimeoutSound(){ playTone(200, 0.4, 'square', 0.07); }
+  function playLevelUpSound(){ playChime([523,659,784]); }
+  function playGameOverSound(){ playChime([392,330,262]); }
+  function playWonSound(){ playChime([523,659,784,1046]); }
+
+  // ---------------- game options ----------------
+  const PLAYER_COUNT_OPTIONS = [2,3,4,5,6];
+  const TIME_OPTIONS = [
+    {value: '0', ms: null, label: 'Sin límite'},
+    {value: '60000', ms: 60000, label: '1 minuto por nivel'},
+    {value: '120000', ms: 120000, label: '2 minutos por nivel'},
+    {value: '300000', ms: 300000, label: '5 minutos por nivel'}
+  ];
+  function formatTime(ms){
+    const s = Math.max(0, Math.ceil(ms/1000));
+    const m = Math.floor(s/60);
+    const r = s % 60;
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
   const STARS_AT = [2,5];
   const LIVES_AT = [3,6];
   const MAX_LEVEL = 8;
@@ -361,6 +427,10 @@ const firebaseConfig = {
   let toastId = 0;
   let creating = false, joining = false;
   let joinInputValue = '';
+  let selectedMaxPlayers = 2;
+  let selectedTimeLimit = null;
+  let timerInterval = null;
+  let timeoutInFlight = false;
 
   const app = document.getElementById('app');
   const toastWrap = document.getElementById('toastWrap');
@@ -404,6 +474,24 @@ const firebaseConfig = {
         el('p', {class:'sub'}, ['Reciben cartas del 1 al 100, ocultas para el otro. Tienen que soltarlas en orden ascendente, sin hablar ni dar señales. Solo la intuición.'])
       ]),
       el('div', {class:'home-actions'}, [
+        el('div', {class:'config-block'}, [
+          el('div', {class:'config-row'}, [
+            el('label', {}, ['Jugadores']),
+            el('select', {onchange: function(e){ selectedMaxPlayers = parseInt(e.target.value, 10); }},
+              PLAYER_COUNT_OPTIONS.map(function(n){
+                return el('option', {value: String(n), selected: n === selectedMaxPlayers ? 'selected' : null}, [n + ' jugadores']);
+              })
+            )
+          ]),
+          el('div', {class:'config-row'}, [
+            el('label', {}, ['Tiempo por nivel']),
+            el('select', {onchange: function(e){ const opt = TIME_OPTIONS.find(function(o){ return o.value === e.target.value; }); selectedTimeLimit = opt ? opt.ms : null; }},
+              TIME_OPTIONS.map(function(o){
+                return el('option', {value: o.value, selected: (selectedTimeLimit === o.ms) ? 'selected' : null}, [o.label]);
+              })
+            )
+          ])
+        ]),
         el('button', {class:'btn btn-primary', onclick: onCreateRoom, disabled: creating ? 'true' : null}, [creating ? 'Creando sala…' : 'Crear una sala']),
         el('div', {class:'join-row'}, [
           (function(){
@@ -428,11 +516,13 @@ const firebaseConfig = {
   function renderWaiting(){
     clear(app);
     const codeChars = roomCode.split('').map(function(c){ return el('span', {}, [c]); });
+    const have = roomData && roomData.players ? roomData.players.length : 1;
+    const need = roomData && roomData.maxPlayers ? roomData.maxPlayers : 2;
     const wrap = el('div', {class:'waiting'}, [
       el('h2', {}, ['Compartí este código']),
       el('div', {class:'code-plate'}, codeChars),
       el('button', {class:'copy-link small-link', onclick: onCopyLink}, ['Copiar link para invitar']),
-      el('div', {class:'waiting-row'}, [el('div', {class:'pulse-dot'}), el('span', {}, ['Esperando al otro jugador…'])])
+      el('div', {class:'waiting-row'}, [el('div', {class:'pulse-dot'}), el('span', {}, ['Esperando jugadores… (' + have + '/' + need + ')'])])
     ]);
     app.appendChild(wrap);
   }
@@ -443,9 +533,9 @@ const firebaseConfig = {
     const p = roomData.players.find(function(p){ return p.uid === myUid; });
     return p ? p.order : -1;
   }
-  function otherPlayer(){
-    if (!roomData || !roomData.players) return null;
-    return roomData.players.find(function(p){ return p.uid !== myUid; }) || null;
+  function otherPlayers(){
+    if (!roomData || !roomData.players) return [];
+    return roomData.players.filter(function(p){ return p.uid !== myUid; }).sort(function(a,b){ return a.order-b.order; });
   }
 
   function renderGame(){
@@ -459,12 +549,20 @@ const firebaseConfig = {
     const starsEls = [];
     for (let i=0;i<MAX_STARS;i++) starsEls.push(el('span', {class: 'diamond' + (i<stars?'':' off')}));
 
+    let timerTag = null;
+    if (rd.timeLimitMs && rd.levelStartedAt) {
+      const remaining = rd.timeLimitMs - (Date.now() - rd.levelStartedAt);
+      const urgent = remaining <= 10000;
+      timerTag = el('div', {class:'timer-tag' + (urgent ? ' urgent' : '')}, [formatTime(remaining)]);
+    }
+
     const topbar = el('div', {class:'topbar'}, [
       el('div', {}, [
         el('div', {class:'room-tag'}, ['SALA ' + roomCode]),
         el('div', {class:'level-tag'}, ['Nivel ' + level])
       ]),
       el('div', {class:'meters'}, [
+        timerTag,
         el('div', {class:'meter'}, livesEls),
         el('div', {class:'meter'}, starsEls)
       ])
@@ -490,12 +588,11 @@ const firebaseConfig = {
       ]));
     }
 
-    const other = otherPlayer();
-    const otherCount = other && rd.handCounts ? (rd.handCounts[other.uid] || 0) : 0;
-    board.appendChild(el('div', {class:'opponent-row'}, [
-      el('span', {}, ['Tu compañero tiene']),
-      el('strong', {}, [otherCount + (otherCount===1 ? ' carta' : ' cartas')])
-    ]));
+    const others = otherPlayers();
+    board.appendChild(el('div', {class:'players-row'}, others.map(function(p){
+      const count = rd.handCounts ? (rd.handCounts[p.uid] || 0) : 0;
+      return el('div', {class:'player-chip'}, ['J' + (p.order+1) + ': ', el('strong', {}, [String(count)])]);
+    })));
 
     const wrap = el('div', {class:'game'}, [topbar]);
 
@@ -561,6 +658,7 @@ const firebaseConfig = {
 
   // ---------------- actions ----------------
   async function onCreateRoom(){
+    ensureAudio();
     if (!firebaseReady || creating) return;
     creating = true; render();
     try {
@@ -575,10 +673,13 @@ const firebaseConfig = {
         status: 'waiting',
         createdAt: Date.now(),
         players: [{uid: myUid, order: 0}],
+        maxPlayers: selectedMaxPlayers,
         level: 1,
         lives: START_LIVES,
         stars: START_STARS,
         dealSeed: null,
+        timeLimitMs: selectedTimeLimit,
+        levelStartedAt: null,
         playedCards: [],
         handCounts: {},
         starRequest: null,
@@ -594,6 +695,7 @@ const firebaseConfig = {
   }
 
   async function onJoinRoom(codeArg){
+    ensureAudio();
     if (!firebaseReady || joining) return;
     const code = (typeof codeArg === 'string' ? codeArg : joinInputValue).toUpperCase().trim();
     if (!code) return;
@@ -610,13 +712,15 @@ const firebaseConfig = {
         const s = await tx.get(ref);
         const data = s.data();
         let players = data.players || [];
+        const maxPlayers = data.maxPlayers || 2;
         if (players.find(function(p){ return p.uid === myUid; })) return;
-        if (players.length >= 2) { full = true; return; }
+        if (players.length >= maxPlayers) { full = true; return; }
         players = players.concat([{uid: myUid, order: players.length}]);
         const update = {players: players};
-        if (players.length === 2 && data.status === 'waiting') {
+        if (players.length === maxPlayers && data.status === 'waiting') {
           update.status = 'playing';
           update.dealSeed = Math.floor(Math.random() * 2147483647);
+          update.levelStartedAt = Date.now();
           const hc = {};
           players.forEach(function(p){ hc[p.uid] = 1; });
           update.handCounts = hc;
@@ -624,7 +728,7 @@ const firebaseConfig = {
         tx.update(ref, update);
       });
       if (full) {
-        joinError = 'Esa sala ya tiene dos jugadores.';
+        joinError = 'Esa sala ya está completa.';
         return;
       }
       enterRoom(code);
@@ -646,6 +750,7 @@ const firebaseConfig = {
   }
 
   async function onPlayCard(value){
+    ensureAudio();
     if (!roomData || roomData.status !== 'playing') return;
     const ref = roomRef(roomCode);
     try {
@@ -665,10 +770,12 @@ const firebaseConfig = {
   }
 
   async function onRequestStar(){
+    ensureAudio();
     if (!roomData || roomData.stars < 1 || roomData.starRequest) return;
     await updateDoc(roomRef(roomCode), {starRequest: {by: myUid, confirms: [myUid], id: Date.now()}});
   }
   async function onAcceptStar(){
+    ensureAudio();
     if (!roomData || !roomData.starRequest) return;
     try {
       await runTransaction(fsDb, async function(tx){
@@ -692,6 +799,7 @@ const firebaseConfig = {
       minVal = sorted[0];
       try { await updateDoc(handRef(roomCode, myUid), {cards: sorted.slice(1)}); } catch(e) {}
     }
+    let applied = false;
     try {
       await runTransaction(fsDb, async function(tx){
         const ref = roomRef(roomCode);
@@ -708,12 +816,14 @@ const firebaseConfig = {
           update.stars = Math.max(0, (data.stars||0) - 1);
           update.starRequest = null;
         }
-        if (Object.keys(update).length) tx.update(ref, update);
+        if (Object.keys(update).length) { tx.update(ref, update); applied = true; }
       });
+      if (applied) playStarSound();
     } catch(e) {}
   }
 
   async function onNextLevel(){
+    ensureAudio();
     hideOverlay();
     try {
       await runTransaction(fsDb, async function(tx){
@@ -731,13 +841,14 @@ const firebaseConfig = {
         tx.update(ref, {
           status: 'playing', level: nextLevel, lives: lives, stars: stars,
           playedCards: [], handCounts: hc, starRequest: null,
-          completedLevel: null, rewardText: null
+          completedLevel: null, rewardText: null, levelStartedAt: Date.now()
         });
       });
     } catch(e) {}
   }
 
   async function onRestart(){
+    ensureAudio();
     hideOverlay();
     try {
       await runTransaction(fsDb, async function(tx){
@@ -750,13 +861,14 @@ const firebaseConfig = {
           status: 'playing', level: 1, lives: START_LIVES, stars: START_STARS,
           dealSeed: Math.floor(Math.random()*2147483647),
           playedCards: [], handCounts: hc, starRequest: null,
-          completedLevel: null, rewardText: null, processedMistakeKeys: []
+          completedLevel: null, rewardText: null, processedMistakeKeys: [],
+          levelStartedAt: Date.now()
         });
       });
     } catch(e) {}
   }
 
-  // ---------------- mistake / level-complete detection ----------------
+  // ---------------- mistake / level-complete / timeout detection ----------------
   async function handleMistakeCheck(newPlayed){
     if (!roomData || !handData) return;
     const normals = newPlayed.filter(function(c){ return c.type === 'normal'; });
@@ -789,7 +901,7 @@ const firebaseConfig = {
             }
             tx.update(ref, update);
           });
-          if (lifeLost) showToast('¡Ups! Había una carta más baja sin jugar.');
+          if (lifeLost) { showToast('¡Ups! Había una carta más baja sin jugar.'); playMistakeSound(); }
         } catch(e) {}
       }
     }
@@ -820,46 +932,98 @@ const firebaseConfig = {
     }
   }
 
+  async function checkTimeout(){
+    if (!roomData || !roomData.timeLimitMs || roomData.status !== 'playing' || !roomData.levelStartedAt) return;
+    if (Date.now() - roomData.levelStartedAt < roomData.timeLimitMs) return;
+    if (timeoutInFlight) return;
+    timeoutInFlight = true;
+    try {
+      let applied = false;
+      await runTransaction(fsDb, async function(tx){
+        const ref = roomRef(roomCode);
+        const snap = await tx.get(ref);
+        const data = snap.data();
+        if (data.status !== 'playing' || !data.timeLimitMs || !data.levelStartedAt) return;
+        if (Date.now() - data.levelStartedAt < data.timeLimitMs) return;
+        const newLives = Math.max(0, (data.lives||0) - 1);
+        const hc = {};
+        (data.players||[]).forEach(function(p){ hc[p.uid] = data.level; });
+        const update = {
+          lives: newLives, playedCards: [], handCounts: hc,
+          levelStartedAt: Date.now(), dealSeed: Math.floor(Math.random()*2147483647)
+        };
+        if (newLives <= 0) update.status = 'gameover';
+        tx.update(ref, update);
+        applied = true;
+      });
+      if (applied) { playTimeoutSound(); showToast('¡Se acabó el tiempo! Cartas nuevas para este nivel.'); }
+    } catch(e) {}
+    timeoutInFlight = false;
+  }
+
+  function ensureTimerLoop(){
+    if (timerInterval) return;
+    timerInterval = setInterval(function(){
+      if (roomData && roomData.timeLimitMs && roomData.status === 'playing') {
+        checkTimeout();
+      }
+      if (view === 'playing' && roomData && roomData.timeLimitMs) render();
+    }, 1000);
+  }
+
   // ---------------- subscriptions ----------------
   function enterRoom(code){
     roomCode = code;
     if (roomUnsub) roomUnsub();
     if (handUnsub) handUnsub();
     processedNormalKeys = new Set();
-    handData = null; handDocLevel = null; dealInFlightForLevel = null;
+    handData = null; handDocKey = null; dealInFlightKey = null;
     roomUnsub = onSnapshot(roomRef(code), function(snap){
       if (!snap.exists()) return;
       const prevPlayed = roomData ? (roomData.playedCards||[]) : [];
+      const prevStatus = roomData ? roomData.status : null;
       roomData = snap.data();
       const newlyAdded = (roomData.playedCards||[]).slice(prevPlayed.length);
+      const maxPlayers = roomData.maxPlayers || 2;
 
-      if (!roomData.players || roomData.players.length < 2 || roomData.status === 'waiting') {
+      if (!roomData.players || roomData.players.length < maxPlayers || roomData.status === 'waiting') {
         view = 'waiting';
       } else {
         view = 'playing';
         ensureHandSubscription();
+        newlyAdded.forEach(function(c){ if (c.type === 'normal' || c.type === 'star') playCardSound(); });
         if (newlyAdded.length) handleMistakeCheck(newlyAdded);
         if (roomData.starRequest) handleStarResolution();
         if (roomData.status === 'playing') checkLevelComplete();
+        if (prevStatus !== roomData.status) {
+          if (roomData.status === 'level-complete') playLevelUpSound();
+          else if (roomData.status === 'gameover') playGameOverSound();
+          else if (roomData.status === 'won') playWonSound();
+        }
       }
       render();
     });
   }
 
-  let handDocLevel = null;
-  let dealInFlightForLevel = null;
+  let handDocKey = null;
+  let dealInFlightKey = null;
+
+  function currentDealKey(){
+    return roomData.level + '_' + roomData.dealSeed;
+  }
 
   async function dealIfNeeded(ref, order){
     // one-time read to see what's really persisted before ever overwriting a
     // hand — avoids wiping an in-progress hand when reconnecting mid-level.
-    if (dealInFlightForLevel === roomData.level) return;
-    dealInFlightForLevel = roomData.level;
+    const key = currentDealKey();
+    if (dealInFlightKey === key) return;
+    dealInFlightKey = key;
     try {
       const snap = await getDoc(ref);
       const existing = snap.exists() ? snap.data() : null;
-      if (!existing || existing.level !== roomData.level) {
+      if (!existing || existing.level !== roomData.level || existing.dealSeed !== roomData.dealSeed) {
         const initial = handForLevel(roomData.dealSeed, roomData.level, order);
-        await setDoc(ref, {cards: initial, level: roomData.level});
+        await setDoc(ref, {cards: initial, level: roomData.level, dealSeed: roomData.dealSeed});
       }
     } catch(e) {}
   }
@@ -873,11 +1037,11 @@ const firebaseConfig = {
       handUnsub = onSnapshot(ref, function(snap){
         const data = snap.exists() ? snap.data() : null;
         handData = data;
-        handDocLevel = data ? data.level : null;
+        handDocKey = data ? (data.level + '_' + data.dealSeed) : null;
         render();
       });
     }
-    if (roomData.level !== handDocLevel) {
+    if (currentDealKey() !== handDocKey) {
       dealIfNeeded(ref, order);
     }
   }
@@ -896,6 +1060,7 @@ const firebaseConfig = {
       return;
     }
     render();
+    ensureTimerLoop();
     const hash = (location.hash || '').replace('#','').toUpperCase().trim();
     if (hash) {
       onJoinRoom(hash);
