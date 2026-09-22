@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Mind — En línea</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%A0%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F3EEE3;
+    --surface: #FFFFFF;
+    --surface-2: #EAE2D2;
+    --text: #241F18;
+    --text-muted: #837C6C;
+    --accent: #B3702F;
+    --accent-soft: #E7D3B2;
+    --teal: #2F7A72;
+    --teal-soft: #CFE6E2;
+    --danger: #B23F35;
+    --danger-soft: #F0D3CE;
+    --border: rgba(36,31,24,0.12);
+    --shadow: 0 1px 2px rgba(36,31,24,0.06), 0 8px 24px rgba(36,31,24,0.08);
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color-scheme: light;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14141B;
+      --surface: #1D1C24;
+      --surface-2: #26242F;
+      --text: #ECE7DC;
+      --text-muted: #9B96A5;
+      --accent: #E3A75C;
+      --accent-soft: #3A2E1E;
+      --teal: #6FBDB2;
+      --teal-soft: #1B2E2C;
+      --danger: #E28479;
+      --danger-soft: #3A2320;
+      --border: rgba(236,231,220,0.12);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14141B;
+    --surface: #1D1C24;
+    --surface-2: #26242F;
+    --text: #ECE7DC;
+    --text-muted: #9B96A5;
+    --accent: #E3A75C;
+    --accent-soft: #3A2E1E;
+    --teal: #6FBDB2;
+    --teal-soft: #1B2E2C;
+    --danger: #E28479;
+    --danger-soft: #3A2320;
+    --border: rgba(236,231,220,0.12);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.35);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+  #app {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; }
+  p { margin: 0; }
+  button {
+    font-family: var(--font-body);
+    font-size: 15px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: inherit;
+  }
+  input {
+    font-family: var(--font-body);
+    font-size: 16px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px 22px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 15px;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary { background: var(--text); color: var(--bg); }
+  .btn-secondary { background: var(--surface-2); color: var(--text); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn:disabled:active { transform: none; }
+
+  /* ---------- Home ---------- */
+  .home { display: flex; flex-direction: column; flex: 1; justify-content: center; gap: 34px; }
+  .home-hero { text-align: left; }
+  .home-hero .eyebrow { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+  .home-hero h1 { font-size: 40px; line-height: 1.05; letter-spacing: -0.01em; }
+  .home-hero p.sub { margin-top: 12px; color: var(--text-muted); font-size: 15.5px; line-height: 1.5; max-width: 42ch; }
+  .home-actions { display: flex; flex-direction: column; gap: 14px; }
+  .join-row { display: flex; gap: 10px; }
+  .join-row input {
+    flex: 1; min-width: 0; padding: 13px 16px; border-radius: 999px;
+    letter-spacing: 0.08em; text-transform: uppercase; text-align: center;
+  }
+  .join-row input::placeholder { text-transform: none; letter-spacing: normal; color: var(--text-muted); }
+  .error-msg { color: var(--danger); font-size: 14px; }
+  .home-foot { color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+
+  /* ---------- Waiting ---------- */
+  .waiting { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 28px; text-align: center; }
+  .code-plate {
+    display: flex; gap: 8px;
+  }
+  .code-plate span {
+    font-family: var(--font-display);
+    font-size: 34px;
+    width: 52px; height: 64px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: var(--shadow);
+  }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ opacity:0.35; transform: scale(0.9);} 50%{ opacity:1; transform: scale(1.15);} }
+  .waiting-row { display:flex; align-items:center; gap:10px; color: var(--text-muted); font-size: 14.5px; }
+  .copy-link { font-size: 13.5px; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---------- Game screen ---------- */
+  .game { display: flex; flex-direction: column; flex: 1; gap: 18px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; }
+  .room-tag { font-size: 12.5px; color: var(--text-muted); letter-spacing: 0.05em; }
+  .level-tag { font-family: var(--font-display); font-size: 22px; }
+  .meters { display: flex; gap: 16px; align-items: center; }
+  .meter { display: flex; gap: 4px; align-items: center; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); }
+  .dot.off { background: var(--surface-2); border: 1px solid var(--border); }
+  .diamond { width: 9px; height: 9px; background: var(--teal); transform: rotate(45deg); border-radius: 2px; }
+  .diamond.off { background: var(--surface-2); border: 1px solid var(--border); transform: rotate(45deg); }
+
+  .board {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px 16px;
+    box-shadow: var(--shadow);
+    min-height: 0;
+  }
+  .board-label { font-size: 12.5px; color: var(--text-muted); }
+  .sequence-track {
+    display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
+    min-height: 68px;
+  }
+  .seq-empty { color: var(--text-muted); font-size: 14px; align-self: center; }
+  .card-chip {
+    font-family: var(--font-display);
+    font-size: 20px;
+    min-width: 46px; height: 58px;
+    padding: 0 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-soft);
+    border-radius: 9px;
+    color: var(--text);
+  }
+  .card-chip.mistake { background: var(--danger-soft); }
+  .card-chip.enter { animation: land 0.32s ease-out; }
+  @keyframes land { from { transform: translateY(-10px) scale(0.85); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+  .discard-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .discard-row .card-chip { background: var(--teal-soft); min-width: 38px; height: 46px; font-size: 16px; }
+
+  .opponent-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface-2); border-radius: 12px; font-size: 14px; color: var(--text-muted); }
+  .opponent-row strong { color: var(--text); font-weight: 600; }
+
+  .hand-section { display: flex; flex-direction: column; gap: 10px; }
+  .hand-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; -webkit-overflow-scrolling: touch; }
+  .hand-card {
+    font-family: var(--font-display);
+    font-size: 26px;
+    min-width: 62px; height: 82px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+    border: 1.5px solid var(--text);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    transition: transform 0.12s ease;
+  }
+  .hand-card:active { transform: translateY(3px) scale(0.97); }
+
+  .action-row { display: flex; gap: 10px; }
+  .action-row .btn { flex: 1; }
+
+  .banner {
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--teal-soft); border: 1px solid var(--teal);
+    border-radius: 14px; padding: 14px 16px; font-size: 14.5px;
+  }
+  .banner-actions { display: flex; gap: 10px; }
+  .banner-actions .btn { padding: 9px 16px; font-size: 14px; }
+
+  .toast-wrap { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; z-index: 50; }
+  .toast {
+    background: var(--text); color: var(--bg);
+    padding: 10px 18px; border-radius: 999px; font-size: 13.5px; font-weight: 500;
+    box-shadow: var(--shadow);
+    animation: toast-in 0.25s ease-out;
+  }
+  @keyframes toast-in { from { opacity:0; transform: translateY(-8px);} to { opacity:1; transform: translateY(0);} }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,17,12,0.55);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    z-index: 40;
+  }
+  .overlay-card {
+    background: var(--surface); border-radius: 22px; padding: 30px 26px;
+    max-width: 380px; width: 100%; text-align: center; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .overlay-card h2 { font-size: 26px; }
+  .overlay-card p { color: var(--text-muted); font-size: 14.5px; line-height: 1.5; }
+  .reward-line { font-size: 14px; color: var(--teal); font-weight: 600; }
+
+  .small-link { background:none; border:none; color: var(--text-muted); font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+// ============================================================
+//  PEGÁ ACÁ TU CONFIGURACIÓN DE FIREBASE (ver instrucciones)
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyD6L9ImiTCplI4EhjMXVAlZ5D7zA4bPyXE",
+  authDomain: "the-mind-e7f5f.firebaseapp.com",
+  projectId: "the-mind-e7f5f",
+  storageBucket: "the-mind-e7f5f.firebasestorage.app",
+  messagingSenderId: "731103703936",
+  appId: "1:731103703936:web:da9245192b154f27004765",
+  measurementId: "G-WZD4ZK4HCQ"
+};
+// ============================================================
+
+(function(){
+  "use strict";
+
+  let fsApp = null, fsDb = null, firebaseReady = false;
+  try {
+    if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "TU_API_KEY") {
+      fsApp = initializeApp(firebaseConfig);
+      fsDb = getFirestore(fsApp);
+      firebaseReady = true;
+    }
+  } catch (e) { firebaseReady = false; }
+
+  function roomRef(code){ return doc(fsDb, 'rooms', code); }
+  function handRef(code, uid){ return doc(fsDb, 'rooms', code, 'hands', uid); }
+
+  function getMyUid(){
+    let id = null;
+    try { id = localStorage.getItem('mind_uid'); } catch(e) {}
+    if (!id) {
+      id = 'p_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try { localStorage.setItem('mind_uid', id); } catch(e) {}
+    }
+    return id;
+  }
+
+  // ---------------- deterministic dealing ----------------
+  function mulberry32(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function combinedSeed(dealSeed, level){
+    return (dealSeed ^ Math.imul(level, 2654435761)) >>> 0;
+  }
+  function shuffledDeck(seed){
+    const rand = mulberry32(seed);
+    const deck = [];
+    for (let i=1;i<=100;i++) deck.push(i);
+    for (let i=deck.length-1;i>0;i--){
+      const j = Math.floor(rand()*(i+1));
+      const tmp = deck[i]; deck[i]=deck[j]; deck[j]=tmp;
+    }
+    return deck;
+  }
+  function handForLevel(dealSeed, level, order){
+    const deck = shuffledDeck(combinedSeed(dealSeed, level));
+    return deck.slice(order*level, order*level+level).sort((a,b)=>a-b);
+  }
+
+  const STARS_AT = [2,5];
+  const LIVES_AT = [3,6];
+  const MAX_LEVEL = 8;
+  const MAX_LIVES = 5;
+  const MAX_STARS = 3;
+  const START_LIVES = 3;
+  const START_STARS = 1;
+
+  function randomCode(){
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let s = '';
+    for (let i=0;i<4;i++) s += chars[Math.floor(Math.random()*chars.length)];
+    return s;
+  }
+
+  // ---------------- state ----------------
+  let myUid = getMyUid();
+  let view = 'loading'; // loading | home | waiting | playing
+  let joinError = '';
+  let roomCode = null;
+  let roomData = null;
+  let handData = null; // {cards:[...], level}
+  let roomUnsub = null, handUnsub = null;
+  let processedNormalKeys = new Set();
+  let toastId = 0;
+  let creating = false, joining = false;
+  let joinInputValue = '';
+
+  const app = document.getElementById('app');
+  const toastWrap = document.getElementById('toastWrap');
+
+  function showToast(msg){
+    const id = ++toastId;
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    toastWrap.appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 3200);
+  }
+
+  function el(tag, attrs, children){
+    const node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function(k){
+      if (attrs[k] === null || attrs[k] === undefined || attrs[k] === false) return;
+      if (k === 'class') node.className = attrs[k];
+      else if (k === 'html') node.innerHTML = attrs[k];
+      else if (k.indexOf('on') === 0) node.addEventListener(k.slice(2), attrs[k]);
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children||[]).forEach(function(c){
+      if (c == null) return;
+      if (typeof c === 'string') node.appendChild(document.createTextNode(c));
+      else node.appendChild(c);
+    });
+    return node;
+  }
+
+  function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+
+  // ---------------- render: home ----------------
+  function renderHome(){
+    clear(app);
+    const wrap = el('div', {class:'home'}, [
+      el('div', {class:'home-hero'}, [
+        el('div', {class:'eyebrow'}, ['un juego de silencio']),
+        el('h1', {}, ['The Mind']),
+        el('p', {class:'sub'}, ['Reciben cartas del 1 al 100, ocultas para el otro. Tienen que soltarlas en orden ascendente, sin hablar ni dar señales. Solo la intuición.'])
+      ]),
+      el('div', {class:'home-actions'}, [
+        el('button', {class:'btn btn-primary', onclick: onCreateRoom, disabled: creating ? 'true' : null}, [creating ? 'Creando sala…' : 'Crear una sala']),
+        el('div', {class:'join-row'}, [
+          (function(){
+            const input = el('input', {
+              placeholder: 'Código de sala',
+              maxlength: '4',
+              value: joinInputValue,
+              oninput: function(e){ joinInputValue = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''); e.target.value = joinInputValue; }
+            });
+            return input;
+          })(),
+          el('button', {class:'btn btn-secondary', onclick: onJoinRoom, disabled: joining ? 'true' : null}, [joining ? '...' : 'Unirme'])
+        ]),
+        joinError ? el('div', {class:'error-msg'}, [joinError]) : null
+      ]),
+      el('p', {class:'home-foot'}, ['Uno crea la sala y le pasa el código al otro jugador (por WhatsApp, por ejemplo). Cada quien juega desde su propio dispositivo — ahí está la gracia.'])
+    ]);
+    app.appendChild(wrap);
+  }
+
+  // ---------------- render: waiting ----------------
+  function renderWaiting(){
+    clear(app);
+    const codeChars = roomCode.split('').map(function(c){ return el('span', {}, [c]); });
+    const wrap = el('div', {class:'waiting'}, [
+      el('h2', {}, ['Compartí este código']),
+      el('div', {class:'code-plate'}, codeChars),
+      el('button', {class:'copy-link small-link', onclick: onCopyLink}, ['Copiar link para invitar']),
+      el('div', {class:'waiting-row'}, [el('div', {class:'pulse-dot'}), el('span', {}, ['Esperando al otro jugador…'])])
+    ]);
+    app.appendChild(wrap);
+  }
+
+  // ---------------- render: game ----------------
+  function myOrder(){
+    if (!roomData || !roomData.players) return -1;
+    const p = roomData.players.find(function(p){ return p.uid === myUid; });
+    return p ? p.order : -1;
+  }
+  function otherPlayer(){
+    if (!roomData || !roomData.players) return null;
+    return roomData.players.find(function(p){ return p.uid !== myUid; }) || null;
+  }
+
+  function renderGame(){
+    clear(app);
+    const rd = roomData;
+    const status = rd.status;
+    const lives = rd.lives, stars = rd.stars, level = rd.level;
+
+    const livesEls = [];
+    for (let i=0;i<MAX_LIVES;i++) livesEls.push(el('span', {class: 'dot' + (i<lives?'':' off')}));
+    const starsEls = [];
+    for (let i=0;i<MAX_STARS;i++) starsEls.push(el('span', {class: 'diamond' + (i<stars?'':' off')}));
+
+    const topbar = el('div', {class:'topbar'}, [
+      el('div', {}, [
+        el('div', {class:'room-tag'}, ['SALA ' + roomCode]),
+        el('div', {class:'level-tag'}, ['Nivel ' + level])
+      ]),
+      el('div', {class:'meters'}, [
+        el('div', {class:'meter'}, livesEls),
+        el('div', {class:'meter'}, starsEls)
+      ])
+    ]);
+
+    const played = (rd.playedCards || []).slice();
+    const normalCards = played.filter(function(c){ return c.type==='normal' || c.type==='mistake-reveal'; }).sort(function(a,b){ return a.value-b.value; });
+    const starCards = played.filter(function(c){ return c.type==='star'; }).sort(function(a,b){ return a.value-b.value; });
+
+    const seqTrack = el('div', {class:'sequence-track'},
+      normalCards.length ? normalCards.map(function(c){
+        return el('div', {class: 'card-chip' + (c.type==='mistake-reveal' ? ' mistake' : '')}, [String(c.value)]);
+      }) : [el('div', {class:'seq-empty'}, ['Todavía no jugaron ninguna carta.'])]
+    );
+
+    const board = el('div', {class:'board'}, [
+      el('div', {}, [el('div', {class:'board-label'}, ['Secuencia']), seqTrack])
+    ]);
+    if (starCards.length) {
+      board.appendChild(el('div', {}, [
+        el('div', {class:'board-label'}, ['Descartadas con shuriken']),
+        el('div', {class:'discard-row'}, starCards.map(function(c){ return el('div', {class:'card-chip'}, [String(c.value)]); }))
+      ]));
+    }
+
+    const other = otherPlayer();
+    const otherCount = other && rd.handCounts ? (rd.handCounts[other.uid] || 0) : 0;
+    board.appendChild(el('div', {class:'opponent-row'}, [
+      el('span', {}, ['Tu compañero tiene']),
+      el('strong', {}, [otherCount + (otherCount===1 ? ' carta' : ' cartas')])
+    ]));
+
+    const wrap = el('div', {class:'game'}, [topbar]);
+
+    if (rd.starRequest && rd.starRequest.by !== myUid && rd.starRequest.confirms && rd.starRequest.confirms.indexOf(myUid) === -1) {
+      wrap.appendChild(el('div', {class:'banner'}, [
+        el('div', {}, ['Tu compañero propone usar un shuriken. Si aceptás, cada uno descarta su carta más baja al instante.']),
+        el('div', {class:'banner-actions'}, [
+          el('button', {class:'btn btn-primary', onclick: onAcceptStar}, ['Aceptar']),
+          el('button', {class:'btn btn-secondary', onclick: onDeclineStar}, ['Cancelar'])
+        ])
+      ]));
+    } else if (rd.starRequest && rd.starRequest.by === myUid) {
+      wrap.appendChild(el('div', {class:'banner'}, ['Esperando que tu compañero confirme el shuriken…']));
+    }
+
+    wrap.appendChild(board);
+
+    if (handData && handData.cards && status === 'playing') {
+      const handRow = el('div', {class:'hand-row'}, handData.cards.map(function(v){
+        return el('button', {class:'hand-card', onclick: function(){ onPlayCard(v); }}, [String(v)]);
+      }));
+      wrap.appendChild(el('div', {class:'hand-section'}, [
+        el('div', {class:'board-label'}, ['Tu mano']),
+        handRow,
+        el('div', {class:'action-row'}, [
+          el('button', {class:'btn btn-secondary', onclick: onRequestStar, disabled: (stars<1 || rd.starRequest) ? 'true' : null}, ['Usar shuriken']),
+        ])
+      ]));
+    }
+
+    app.appendChild(wrap);
+
+    if (status === 'level-complete') {
+      showOverlay('¡Nivel ' + (rd.completedLevel||level) + ' superado!', rd.rewardText || '', 'Siguiente nivel', onNextLevel);
+    } else if (status === 'gameover') {
+      showOverlay('Fin de la partida', 'Llegaron hasta el nivel ' + level + '.', 'Jugar de nuevo', onRestart);
+    } else if (status === 'won') {
+      showOverlay('¡Ganaron The Mind!', 'Completaron los ' + MAX_LEVEL + ' niveles sin perder la conexión.', 'Jugar de nuevo', onRestart);
+    }
+  }
+
+  function showOverlay(title, sub, btnLabel, onClick){
+    const existing = document.getElementById('gameOverlay');
+    if (existing) existing.remove();
+    const card = el('div', {class:'overlay-card'}, [
+      el('h2', {}, [title]),
+      sub ? el('p', {}, [sub]) : null,
+      el('button', {class:'btn btn-primary', onclick: onClick}, [btnLabel])
+    ]);
+    const overlay = el('div', {class:'overlay', id:'gameOverlay'}, [card]);
+    document.body.appendChild(overlay);
+  }
+  function hideOverlay(){
+    const existing = document.getElementById('gameOverlay');
+    if (existing) existing.remove();
+  }
+
+  function render(){
+    if (view === 'home') renderHome();
+    else if (view === 'waiting') renderWaiting();
+    else if (view === 'playing') renderGame();
+  }
+
+  // ---------------- actions ----------------
+  async function onCreateRoom(){
+    if (!firebaseReady || creating) return;
+    creating = true; render();
+    try {
+      let code = null;
+      for (let i=0;i<5;i++){
+        const candidate = randomCode();
+        const snap = await getDoc(roomRef(candidate));
+        if (!snap.exists()){ code = candidate; break; }
+      }
+      if (!code) code = randomCode() + Date.now().toString(36).slice(-2);
+      await setDoc(roomRef(code), {
+        status: 'waiting',
+        createdAt: Date.now(),
+        players: [{uid: myUid, order: 0}],
+        level: 1,
+        lives: START_LIVES,
+        stars: START_STARS,
+        dealSeed: null,
+        playedCards: [],
+        handCounts: {},
+        starRequest: null,
+        processedMistakeKeys: []
+      });
+      enterRoom(code);
+      location.hash = code;
+    } catch (e) {
+      joinError = 'No se pudo crear la sala. Probá de nuevo.';
+    } finally {
+      creating = false; render();
+    }
+  }
+
+  async function onJoinRoom(codeArg){
+    if (!firebaseReady || joining) return;
+    const code = (typeof codeArg === 'string' ? codeArg : joinInputValue).toUpperCase().trim();
+    if (!code) return;
+    joining = true; joinError = ''; render();
+    try {
+      const ref = roomRef(code);
+      const snap = await getDoc(ref);
+      if (!snap.exists()){
+        joinError = 'No encontramos esa sala. Revisá el código.';
+        return;
+      }
+      let full = false;
+      await runTransaction(fsDb, async function(tx){
+        const s = await tx.get(ref);
+        const data = s.data();
+        let players = data.players || [];
+        if (players.find(function(p){ return p.uid === myUid; })) return;
+        if (players.length >= 2) { full = true; return; }
+        players = players.concat([{uid: myUid, order: players.length}]);
+        const update = {players: players};
+        if (players.length === 2 && data.status === 'waiting') {
+          update.status = 'playing';
+          update.dealSeed = Math.floor(Math.random() * 2147483647);
+          const hc = {};
+          players.forEach(function(p){ hc[p.uid] = 1; });
+          update.handCounts = hc;
+        }
+        tx.update(ref, update);
+      });
+      if (full) {
+        joinError = 'Esa sala ya tiene dos jugadores.';
+        return;
+      }
+      enterRoom(code);
+      location.hash = code;
+    } catch (e) {
+      joinError = 'Algo falló al unirte. Probá de nuevo.';
+    } finally {
+      joining = false; render();
+    }
+  }
+
+  function onCopyLink(){
+    const url = location.origin + location.pathname + '#' + roomCode;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function(){ showToast('Link copiado'); }).catch(function(){ showToast(url); });
+    } else {
+      showToast(url);
+    }
+  }
+
+  async function onPlayCard(value){
+    if (!roomData || roomData.status !== 'playing') return;
+    const ref = roomRef(roomCode);
+    try {
+      await runTransaction(fsDb, async function(tx){
+        const snap = await tx.get(ref);
+        const data = snap.data();
+        const played = (data.playedCards || []).concat([{value: value, by: myUid, type: 'normal', ts: Date.now()}]);
+        const hc = Object.assign({}, data.handCounts);
+        hc[myUid] = Math.max(0, (hc[myUid]||0) - 1);
+        tx.update(ref, {playedCards: played, handCounts: hc});
+      });
+    } catch(e) {}
+    try {
+      const newCards = handData.cards.filter(function(v){ return v !== value; });
+      await updateDoc(handRef(roomCode, myUid), {cards: newCards});
+    } catch(e) {}
+  }
+
+  async function onRequestStar(){
+    if (!roomData || roomData.stars < 1 || roomData.starRequest) return;
+    await updateDoc(roomRef(roomCode), {starRequest: {by: myUid, confirms: [myUid], id: Date.now()}});
+  }
+  async function onAcceptStar(){
+    if (!roomData || !roomData.starRequest) return;
+    try {
+      await runTransaction(fsDb, async function(tx){
+        const snap = await tx.get(roomRef(roomCode));
+        const data = snap.data();
+        if (!data.starRequest) return;
+        const confirms = data.starRequest.confirms || [];
+        if (confirms.indexOf(myUid) !== -1) return;
+        tx.update(roomRef(roomCode), {starRequest: Object.assign({}, data.starRequest, {confirms: confirms.concat([myUid])})});
+      });
+    } catch(e) {}
+  }
+  async function onDeclineStar(){
+    await updateDoc(roomRef(roomCode), {starRequest: null});
+  }
+
+  async function resolveStarForMe(requestId){
+    let minVal = null;
+    if (handData && handData.cards && handData.cards.length) {
+      const sorted = handData.cards.slice().sort(function(a,b){ return a-b; });
+      minVal = sorted[0];
+      try { await updateDoc(handRef(roomCode, myUid), {cards: sorted.slice(1)}); } catch(e) {}
+    }
+    try {
+      await runTransaction(fsDb, async function(tx){
+        const ref = roomRef(roomCode);
+        const snap = await tx.get(ref);
+        const data = snap.data();
+        const update = {};
+        if (minVal !== null) {
+          update.playedCards = (data.playedCards||[]).concat([{value:minVal, by:myUid, type:'star', ts:Date.now()}]);
+          const hc = Object.assign({}, data.handCounts);
+          hc[myUid] = Math.max(0, (hc[myUid]||0) - 1);
+          update.handCounts = hc;
+        }
+        if (data.starRequest && data.starRequest.id === requestId) {
+          update.stars = Math.max(0, (data.stars||0) - 1);
+          update.starRequest = null;
+        }
+        if (Object.keys(update).length) tx.update(ref, update);
+      });
+    } catch(e) {}
+  }
+
+  async function onNextLevel(){
+    hideOverlay();
+    try {
+      await runTransaction(fsDb, async function(tx){
+        const ref = roomRef(roomCode);
+        const snap = await tx.get(ref);
+        const data = snap.data();
+        if (data.status !== 'level-complete') return;
+        const nextLevel = data.level + 1;
+        if (nextLevel > MAX_LEVEL) { tx.update(ref, {status: 'won'}); return; }
+        let lives = data.lives, stars = data.stars;
+        if (LIVES_AT.indexOf(nextLevel) !== -1) lives = Math.min(MAX_LIVES, lives+1);
+        if (STARS_AT.indexOf(nextLevel) !== -1) stars = Math.min(MAX_STARS, stars+1);
+        const hc = {};
+        (data.players||[]).forEach(function(p){ hc[p.uid] = nextLevel; });
+        tx.update(ref, {
+          status: 'playing', level: nextLevel, lives: lives, stars: stars,
+          playedCards: [], handCounts: hc, starRequest: null,
+          completedLevel: null, rewardText: null
+        });
+      });
+    } catch(e) {}
+  }
+
+  async function onRestart(){
+    hideOverlay();
+    try {
+      await runTransaction(fsDb, async function(tx){
+        const ref = roomRef(roomCode);
+        const snap = await tx.get(ref);
+        const data = snap.data();
+        const hc = {};
+        (data.players||[]).forEach(function(p){ hc[p.uid] = 1; });
+        tx.update(ref, {
+          status: 'playing', level: 1, lives: START_LIVES, stars: START_STARS,
+          dealSeed: Math.floor(Math.random()*2147483647),
+          playedCards: [], handCounts: hc, starRequest: null,
+          completedLevel: null, rewardText: null, processedMistakeKeys: []
+        });
+      });
+    } catch(e) {}
+  }
+
+  // ---------------- mistake / level-complete detection ----------------
+  async function handleMistakeCheck(newPlayed){
+    if (!roomData || !handData) return;
+    const normals = newPlayed.filter(function(c){ return c.type === 'normal'; });
+    for (const entry of normals) {
+      const key = entry.ts + '_' + entry.value + '_' + entry.by;
+      if (processedNormalKeys.has(key)) continue;
+      processedNormalKeys.add(key);
+      const threshold = entry.value;
+      const mine = (handData.cards||[]).filter(function(v){ return v < threshold; });
+      if (mine.length) {
+        const remaining = (handData.cards||[]).filter(function(v){ return v >= threshold; });
+        try { await updateDoc(handRef(roomCode, myUid), {cards: remaining}); } catch(e){}
+        let lifeLost = false;
+        try {
+          await runTransaction(fsDb, async function(tx){
+            const ref = roomRef(roomCode);
+            const snap = await tx.get(ref);
+            const data = snap.data();
+            const processed = data.processedMistakeKeys || [];
+            const played2 = (data.playedCards||[]).concat(mine.map(function(v){ return {value:v, by:myUid, type:'mistake-reveal', ts: Date.now()}; }));
+            const hc = Object.assign({}, data.handCounts);
+            hc[myUid] = Math.max(0, (hc[myUid]||0) - mine.length);
+            const update = {playedCards: played2, handCounts: hc};
+            if (processed.indexOf(key) === -1) {
+              update.processedMistakeKeys = processed.concat([key]);
+              const newLives = Math.max(0, (data.lives||0) - 1);
+              update.lives = newLives;
+              if (newLives <= 0) update.status = 'gameover';
+              lifeLost = true;
+            }
+            tx.update(ref, update);
+          });
+          if (lifeLost) showToast('¡Ups! Había una carta más baja sin jugar.');
+        } catch(e) {}
+      }
+    }
+  }
+
+  function handleStarResolution(){
+    if (!roomData || !roomData.starRequest) return;
+    const req = roomData.starRequest;
+    const numPlayers = (roomData.players||[]).length;
+    if (req.confirms && req.confirms.length >= numPlayers) {
+      const key = 'star_' + req.id;
+      if (processedNormalKeys.has(key)) return;
+      processedNormalKeys.add(key);
+      resolveStarForMe(req.id);
+    }
+  }
+
+  function checkLevelComplete(){
+    if (!roomData || roomData.status !== 'playing') return;
+    const total = (roomData.playedCards||[]).length;
+    const expected = roomData.level * (roomData.players||[]).length;
+    if (total >= expected && expected > 0) {
+      const nextLevel = roomData.level + 1;
+      const bits = [];
+      if (LIVES_AT.indexOf(nextLevel) !== -1) bits.push('+1 vida');
+      if (STARS_AT.indexOf(nextLevel) !== -1) bits.push('+1 shuriken');
+      updateDoc(roomRef(roomCode), {status: 'level-complete', completedLevel: roomData.level, rewardText: bits.join(' · ')}).catch(function(){});
+    }
+  }
+
+  // ---------------- subscriptions ----------------
+  function enterRoom(code){
+    roomCode = code;
+    if (roomUnsub) roomUnsub();
+    if (handUnsub) handUnsub();
+    processedNormalKeys = new Set();
+    handData = null; handDocLevel = null; dealInFlightForLevel = null;
+    roomUnsub = onSnapshot(roomRef(code), function(snap){
+      if (!snap.exists()) return;
+      const prevPlayed = roomData ? (roomData.playedCards||[]) : [];
+      roomData = snap.data();
+      const newlyAdded = (roomData.playedCards||[]).slice(prevPlayed.length);
+
+      if (!roomData.players || roomData.players.length < 2 || roomData.status === 'waiting') {
+        view = 'waiting';
+      } else {
+        view = 'playing';
+        ensureHandSubscription();
+        if (newlyAdded.length) handleMistakeCheck(newlyAdded);
+        if (roomData.starRequest) handleStarResolution();
+        if (roomData.status === 'playing') checkLevelComplete();
+      }
+      render();
+    });
+  }
+
+  let handDocLevel = null;
+  let dealInFlightForLevel = null;
+
+  async function dealIfNeeded(ref, order){
+    // one-time read to see what's really persisted before ever overwriting a
+    // hand — avoids wiping an in-progress hand when reconnecting mid-level.
+    if (dealInFlightForLevel === roomData.level) return;
+    dealInFlightForLevel = roomData.level;
+    try {
+      const snap = await getDoc(ref);
+      const existing = snap.exists() ? snap.data() : null;
+      if (!existing || existing.level !== roomData.level) {
+        const initial = handForLevel(roomData.dealSeed, roomData.level, order);
+        await setDoc(ref, {cards: initial, level: roomData.level});
+      }
+    } catch(e) {}
+  }
+
+  function ensureHandSubscription(){
+    if (!roomData || !roomData.dealSeed) return;
+    const order = myOrder();
+    if (order === -1) return;
+    const ref = handRef(roomCode, myUid);
+    if (!handUnsub) {
+      handUnsub = onSnapshot(ref, function(snap){
+        const data = snap.exists() ? snap.data() : null;
+        handData = data;
+        handDocLevel = data ? data.level : null;
+        render();
+      });
+    }
+    if (roomData.level !== handDocLevel) {
+      dealIfNeeded(ref, order);
+    }
+  }
+
+  // ---------------- boot ----------------
+  function boot(){
+    view = 'home';
+    if (!firebaseReady) {
+      clear(app);
+      app.appendChild(el('div', {class:'home'}, [
+        el('div', {class:'home-hero'}, [
+          el('h1', {}, ['The Mind']),
+          el('p', {class:'sub'}, ['Todavía falta configurar Firebase: abrí el archivo HTML y pegá tu firebaseConfig donde dice "PEGÁ ACÁ TU CONFIGURACIÓN DE FIREBASE", cerca del principio del <script>.'])
+        ])
+      ]));
+      return;
+    }
+    render();
+    const hash = (location.hash || '').replace('#','').toUpperCase().trim();
+    if (hash) {
+      onJoinRoom(hash);
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
