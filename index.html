@@ -273,6 +273,7 @@
   .reward-line { font-size: 14px; color: var(--teal); font-weight: 600; }
 
   .small-link { background:none; border:none; color: var(--text-muted); font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+  .home-link { display: inline-block; margin-bottom: 2px; padding-left: 0; }
 </style>
 </head>
 <body>
@@ -548,6 +549,7 @@ const firebaseConfig = {
     const have = roomData && roomData.players ? roomData.players.length : 1;
     const need = roomData && roomData.maxPlayers ? roomData.maxPlayers : 2;
     const wrap = el('div', {class:'waiting'}, [
+      el('button', {class:'small-link home-link', onclick: onGoHome}, ['← Inicio']),
       el('h2', {}, ['Compartí este código']),
       el('div', {class:'code-plate'}, codeChars),
       el('button', {class:'copy-link small-link', onclick: onCopyLink}, ['Copiar link para invitar']),
@@ -587,6 +589,7 @@ const firebaseConfig = {
 
     const topbar = el('div', {class:'topbar'}, [
       el('div', {}, [
+        el('button', {class:'small-link home-link', onclick: onGoHome}, ['← Inicio']),
         el('div', {class:'room-tag'}, ['SALA ' + roomCode]),
         el('div', {class:'level-tag'}, ['Nivel ' + level])
       ]),
@@ -656,11 +659,26 @@ const firebaseConfig = {
 
     if (status === 'level-complete') {
       showOverlay('¡Nivel ' + (rd.completedLevel||level) + ' superado!', rd.rewardText || '', 'Siguiente nivel', onNextLevel);
-    } else if (status === 'gameover') {
-      showOverlay('Fin de la partida', 'Llegaron hasta el nivel ' + level + '.', 'Jugar de nuevo', onRestart);
-    } else if (status === 'won') {
-      const elapsedText = rd.gameStartedAt ? (' Tiempo: ' + formatDuration(Date.now() - rd.gameStartedAt) + '.') : '';
-      showOverlay('¡Ganaron The Mind!', 'Completaron los ' + MAX_LEVEL + ' niveles.' + elapsedText, 'Jugar de nuevo', onRestart);
+    } else if (status === 'gameover' || status === 'won') {
+      const votes = rd.restartVotes || [];
+      const totalPlayers = (rd.players||[]).length;
+      const iVoted = votes.indexOf(myUid) !== -1;
+      const title = status === 'won' ? '¡Ganaron The Mind!' : 'Fin de la partida';
+      let sub;
+      if (status === 'won') {
+        const elapsedText = rd.gameStartedAt ? (' Tiempo: ' + formatDuration(Date.now() - rd.gameStartedAt) + '.') : '';
+        sub = 'Completaron los ' + MAX_LEVEL + ' niveles.' + elapsedText;
+      } else {
+        sub = 'Llegaron hasta el nivel ' + level + '.';
+      }
+      if (iVoted) {
+        sub += ' Esperando a los demás (' + votes.length + '/' + totalPlayers + ')…';
+        showOverlay(title, sub, null, null);
+      } else {
+        showOverlay(title, sub, 'Jugar de nuevo', onVoteRestart);
+      }
+    } else {
+      hideOverlay();
     }
   }
 
@@ -670,7 +688,7 @@ const firebaseConfig = {
     const card = el('div', {class:'overlay-card'}, [
       el('h2', {}, [title]),
       sub ? el('p', {}, [sub]) : null,
-      el('button', {class:'btn btn-primary', onclick: onClick}, [btnLabel])
+      btnLabel ? el('button', {class:'btn btn-primary', onclick: onClick}, [btnLabel]) : null
     ]);
     const overlay = el('div', {class:'overlay', id:'gameOverlay'}, [card]);
     document.body.appendChild(overlay);
@@ -759,7 +777,8 @@ const firebaseConfig = {
         playedCards: [],
         handCounts: {},
         starRequest: null,
-        processedMistakeKeys: []
+        processedMistakeKeys: [],
+        restartVotes: []
       });
       enterRoom(code);
       location.hash = code;
@@ -910,7 +929,7 @@ const firebaseConfig = {
         if (data.status !== 'level-complete') return;
         const nextLevel = data.level + 1;
         if (nextLevel > MAX_LEVEL) {
-          tx.update(ref, {status: 'won'});
+          tx.update(ref, {status: 'won', restartVotes: []});
           const elapsed = data.gameStartedAt ? (Date.now() - data.gameStartedAt) : 0;
           tx.set(doc(fsDb, 'leaderboard', roomCode), {
             teamName: data.teamName || roomCode,
@@ -935,23 +954,33 @@ const firebaseConfig = {
     } catch(e) {}
   }
 
-  async function onRestart(){
+  async function onVoteRestart(){
     ensureAudio();
-    hideOverlay();
+    if (!roomData) return;
     try {
       await runTransaction(fsDb, async function(tx){
         const ref = roomRef(roomCode);
         const snap = await tx.get(ref);
         const data = snap.data();
-        const hc = {};
-        (data.players||[]).forEach(function(p){ hc[p.uid] = 1; });
-        tx.update(ref, {
-          status: 'playing', level: 1, lives: START_LIVES, stars: START_STARS,
-          dealSeed: Math.floor(Math.random()*2147483647),
-          playedCards: [], handCounts: hc, starRequest: null,
-          completedLevel: null, rewardText: null, processedMistakeKeys: [],
-          levelStartedAt: Date.now(), gameStartedAt: Date.now()
-        });
+        if (data.status !== 'gameover' && data.status !== 'won') return;
+        const votes = data.restartVotes || [];
+        if (votes.indexOf(myUid) !== -1) return;
+        const newVotes = votes.concat([myUid]);
+        const players = data.players || [];
+        if (newVotes.length >= players.length) {
+          const hc = {};
+          players.forEach(function(p){ hc[p.uid] = 1; });
+          tx.update(ref, {
+            status: 'playing', level: 1, lives: START_LIVES, stars: START_STARS,
+            dealSeed: Math.floor(Math.random()*2147483647),
+            playedCards: [], handCounts: hc, starRequest: null,
+            completedLevel: null, rewardText: null, processedMistakeKeys: [],
+            levelStartedAt: Date.now(), gameStartedAt: Date.now(),
+            restartVotes: []
+          });
+        } else {
+          tx.update(ref, {restartVotes: newVotes});
+        }
       });
     } catch(e) {}
   }
@@ -984,7 +1013,7 @@ const firebaseConfig = {
               update.processedMistakeKeys = processed.concat([key]);
               const newLives = Math.max(0, (data.lives||0) - 1);
               update.lives = newLives;
-              if (newLives <= 0) update.status = 'gameover';
+              if (newLives <= 0) { update.status = 'gameover'; update.restartVotes = []; }
               lifeLost = true;
             }
             tx.update(ref, update);
@@ -1040,7 +1069,7 @@ const firebaseConfig = {
           lives: newLives, playedCards: [], handCounts: hc,
           levelStartedAt: Date.now(), dealSeed: Math.floor(Math.random()*2147483647)
         };
-        if (newLives <= 0) update.status = 'gameover';
+        if (newLives <= 0) { update.status = 'gameover'; update.restartVotes = []; }
         tx.update(ref, update);
         applied = true;
       });
@@ -1057,6 +1086,18 @@ const firebaseConfig = {
       }
       if (view === 'playing' && roomData && roomData.timeLimitMs) render();
     }, 1000);
+  }
+
+  function onGoHome(){
+    if (roomUnsub) { roomUnsub(); roomUnsub = null; }
+    if (handUnsub) { handUnsub(); handUnsub = null; }
+    roomCode = null; roomData = null; handData = null;
+    handDocKey = null; dealInFlightKey = null;
+    processedNormalKeys = new Set();
+    hideOverlay();
+    try { history.replaceState(null, '', location.pathname + location.search); } catch(e) { try { location.hash = ''; } catch(e2) {} }
+    view = 'home';
+    render();
   }
 
   // ---------------- subscriptions ----------------
