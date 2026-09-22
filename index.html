@@ -137,6 +137,7 @@
   .config-block { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
   .config-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .config-row label { font-size: 14px; color: var(--text-muted); }
+  .config-row input { width: 150px; padding: 8px 12px; border-radius: 999px; font-size: 14px; }
   select {
     font-family: var(--font-body); font-size: 14.5px; color: var(--text);
     background: var(--surface-2); border: 1px solid var(--border);
@@ -214,6 +215,12 @@
   .player-chip strong { color: var(--text); font-weight: 600; }
   .timer-tag { font-size: 13.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; padding: 4px 10px; background: var(--surface-2); border-radius: 999px; }
   .timer-tag.urgent { color: var(--danger); background: var(--danger-soft); }
+  .leaderboard-list { display: flex; flex-direction: column; gap: 6px; }
+  .leaderboard-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; font-size: 14px; }
+  .leaderboard-rank { font-family: var(--font-display); font-size: 16px; width: 22px; color: var(--text-muted); }
+  .leaderboard-team { flex: 1; font-weight: 600; }
+  .leaderboard-players { color: var(--text-muted); font-size: 12.5px; }
+  .leaderboard-time { font-family: var(--font-display); font-size: 16px; font-variant-numeric: tabular-nums; }
 
   .hand-section { display: flex; flex-direction: column; gap: 10px; }
   .hand-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; -webkit-overflow-scrolling: touch; }
@@ -275,7 +282,8 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction
+  getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction,
+  collection, query, orderBy, limit, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // ============================================================
@@ -399,6 +407,15 @@ const firebaseConfig = {
     const r = s % 60;
     return m + ':' + (r < 10 ? '0' : '') + r;
   }
+  function formatDuration(ms){
+    const totalSec = Math.max(0, Math.floor(ms/1000));
+    const h = Math.floor(totalSec/3600);
+    const m = Math.floor((totalSec%3600)/60);
+    const s = totalSec % 60;
+    const mm = (h>0 && m<10 ? '0' : '') + m;
+    const ss = (s<10?'0':'') + s;
+    return h>0 ? (h+':'+mm+':'+ss) : (m+':'+ss);
+  }
 
   const STARS_AT = [2,5];
   const LIVES_AT = [3,6];
@@ -429,6 +446,9 @@ const firebaseConfig = {
   let joinInputValue = '';
   let selectedMaxPlayers = 2;
   let selectedTimeLimit = null;
+  let selectedTeamName = '';
+  let leaderboardEntries = null;
+  let leaderboardLoading = false;
   let timerInterval = null;
   let timeoutInFlight = false;
 
@@ -476,6 +496,14 @@ const firebaseConfig = {
       el('div', {class:'home-actions'}, [
         el('div', {class:'config-block'}, [
           el('div', {class:'config-row'}, [
+            el('label', {}, ['Nombre del equipo']),
+            el('input', {
+              placeholder: 'Opcional',
+              value: selectedTeamName,
+              oninput: function(e){ selectedTeamName = e.target.value; }
+            })
+          ]),
+          el('div', {class:'config-row'}, [
             el('label', {}, ['Jugadores']),
             el('select', {onchange: function(e){ selectedMaxPlayers = parseInt(e.target.value, 10); }},
               PLAYER_COUNT_OPTIONS.map(function(n){
@@ -507,7 +535,8 @@ const firebaseConfig = {
         ]),
         joinError ? el('div', {class:'error-msg'}, [joinError]) : null
       ]),
-      el('p', {class:'home-foot'}, ['Uno crea la sala y le pasa el código al otro jugador (por WhatsApp, por ejemplo). Cada quien juega desde su propio dispositivo — ahí está la gracia.'])
+      el('p', {class:'home-foot'}, ['Uno crea la sala y le pasa el código al otro jugador (por WhatsApp, por ejemplo). Cada quien juega desde su propio dispositivo — ahí está la gracia.']),
+      el('button', {class:'small-link', onclick: onOpenLeaderboard}, ['Ver ranking de equipos'])
     ]);
     app.appendChild(wrap);
   }
@@ -630,7 +659,8 @@ const firebaseConfig = {
     } else if (status === 'gameover') {
       showOverlay('Fin de la partida', 'Llegaron hasta el nivel ' + level + '.', 'Jugar de nuevo', onRestart);
     } else if (status === 'won') {
-      showOverlay('¡Ganaron The Mind!', 'Completaron los ' + MAX_LEVEL + ' niveles sin perder la conexión.', 'Jugar de nuevo', onRestart);
+      const elapsedText = rd.gameStartedAt ? (' Tiempo: ' + formatDuration(Date.now() - rd.gameStartedAt) + '.') : '';
+      showOverlay('¡Ganaron The Mind!', 'Completaron los ' + MAX_LEVEL + ' niveles.' + elapsedText, 'Jugar de nuevo', onRestart);
     }
   }
 
@@ -650,10 +680,54 @@ const firebaseConfig = {
     if (existing) existing.remove();
   }
 
+  function renderLeaderboard(){
+    clear(app);
+    const rows = leaderboardLoading
+      ? [el('div', {class:'seq-empty'}, ['Cargando…'])]
+      : (!leaderboardEntries || !leaderboardEntries.length)
+        ? [el('div', {class:'seq-empty'}, ['Todavía nadie completó una partida.'])]
+        : leaderboardEntries.map(function(e, i){
+            return el('div', {class:'leaderboard-row'}, [
+              el('span', {class:'leaderboard-rank'}, [String(i+1)]),
+              el('span', {class:'leaderboard-team'}, [e.teamName || e.roomCode || '—']),
+              el('span', {class:'leaderboard-players'}, [(e.playerCount||2) + 'p']),
+              el('span', {class:'leaderboard-time'}, [formatDuration(e.elapsedMs||0)])
+            ]);
+          });
+    const wrap = el('div', {class:'game'}, [
+      el('div', {class:'topbar'}, [
+        el('h2', {}, ['Ranking']),
+        el('button', {class:'small-link', onclick: function(){ view='home'; render(); }}, ['Volver'])
+      ]),
+      el('div', {class:'board'}, [
+        el('div', {class:'board-label'}, ['Los 20 equipos más rápidos en ganar']),
+        el('div', {class:'leaderboard-list'}, rows)
+      ])
+    ]);
+    app.appendChild(wrap);
+  }
+
+  async function onOpenLeaderboard(){
+    view = 'leaderboard';
+    leaderboardLoading = true;
+    render();
+    try {
+      const q = query(collection(fsDb, 'leaderboard'), orderBy('elapsedMs', 'asc'), limit(20));
+      const snap = await getDocs(q);
+      leaderboardEntries = snap.docs.map(function(d){ return d.data(); });
+    } catch(e) {
+      leaderboardEntries = [];
+    } finally {
+      leaderboardLoading = false;
+      if (view === 'leaderboard') render();
+    }
+  }
+
   function render(){
     if (view === 'home') renderHome();
     else if (view === 'waiting') renderWaiting();
     else if (view === 'playing') renderGame();
+    else if (view === 'leaderboard') renderLeaderboard();
   }
 
   // ---------------- actions ----------------
@@ -674,10 +748,12 @@ const firebaseConfig = {
         createdAt: Date.now(),
         players: [{uid: myUid, order: 0}],
         maxPlayers: selectedMaxPlayers,
+        teamName: (selectedTeamName && selectedTeamName.trim()) || code,
         level: 1,
         lives: START_LIVES,
         stars: START_STARS,
         dealSeed: null,
+        gameStartedAt: null,
         timeLimitMs: selectedTimeLimit,
         levelStartedAt: null,
         playedCards: [],
@@ -721,6 +797,7 @@ const firebaseConfig = {
           update.status = 'playing';
           update.dealSeed = Math.floor(Math.random() * 2147483647);
           update.levelStartedAt = Date.now();
+          update.gameStartedAt = Date.now();
           const hc = {};
           players.forEach(function(p){ hc[p.uid] = 1; });
           update.handCounts = hc;
@@ -832,7 +909,18 @@ const firebaseConfig = {
         const data = snap.data();
         if (data.status !== 'level-complete') return;
         const nextLevel = data.level + 1;
-        if (nextLevel > MAX_LEVEL) { tx.update(ref, {status: 'won'}); return; }
+        if (nextLevel > MAX_LEVEL) {
+          tx.update(ref, {status: 'won'});
+          const elapsed = data.gameStartedAt ? (Date.now() - data.gameStartedAt) : 0;
+          tx.set(doc(fsDb, 'leaderboard', roomCode), {
+            teamName: data.teamName || roomCode,
+            roomCode: roomCode,
+            playerCount: (data.players||[]).length,
+            elapsedMs: elapsed,
+            finishedAt: Date.now()
+          });
+          return;
+        }
         let lives = data.lives, stars = data.stars;
         if (LIVES_AT.indexOf(nextLevel) !== -1) lives = Math.min(MAX_LIVES, lives+1);
         if (STARS_AT.indexOf(nextLevel) !== -1) stars = Math.min(MAX_STARS, stars+1);
@@ -862,7 +950,7 @@ const firebaseConfig = {
           dealSeed: Math.floor(Math.random()*2147483647),
           playedCards: [], handCounts: hc, starRequest: null,
           completedLevel: null, rewardText: null, processedMistakeKeys: [],
-          levelStartedAt: Date.now()
+          levelStartedAt: Date.now(), gameStartedAt: Date.now()
         });
       });
     } catch(e) {}
